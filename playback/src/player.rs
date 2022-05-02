@@ -1,6 +1,7 @@
 use std::cmp::max;
+use std::fs::File;
 use std::future::Future;
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -771,14 +772,26 @@ impl PlayerTrackLoader {
                 }
             };
 
-            let audio_file = Subfile::new(decrypted_file, 0xa7);
+            let mut audio_file = Subfile::new(decrypted_file, 0xa7);
+
+            // clone byte stream
+            let mut cloned_audio_file = Vec::new();
+            audio_file.read_to_end(&mut cloned_audio_file).unwrap();
+            audio_file.rewind().unwrap();
+
+            // save into file
+            info!("saving bytes into file: \"{}\"", format!("/tmp/audios/{}", audio.name));
+            let mut file = File::create(format!("/tmp/audios/{}", audio.name)).unwrap();
+            file.write_all(&cloned_audio_file).unwrap();
 
             let result = if self.config.passthrough {
+                info!("file \"{}\" is passthroughed", audio.name);
                 match PassthroughDecoder::new(audio_file) {
                     Ok(result) => Ok(Box::new(result) as Decoder),
                     Err(e) => Err(AudioError::PassthroughError(e)),
                 }
             } else {
+                info!("file \"{}\" is vorbis passed", audio.name);
                 match VorbisDecoder::new(audio_file) {
                     Ok(result) => Ok(Box::new(result) as Decoder),
                     Err(e) => Err(AudioError::VorbisError(e)),
