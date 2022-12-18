@@ -618,6 +618,25 @@ struct PlayerTrackLoader {
     config: PlayerConfig,
 }
 
+pub fn stream_data_rate(format: FileFormat) -> usize {
+    match format {
+        FileFormat::OGG_VORBIS_96 => 12 * 1024,
+        FileFormat::OGG_VORBIS_160 => 20 * 1024,
+        FileFormat::OGG_VORBIS_320 => 40 * 1024,
+        FileFormat::MP3_256 => 32 * 1024,
+        FileFormat::MP3_320 => 40 * 1024,
+        FileFormat::MP3_160 => 20 * 1024,
+        FileFormat::MP3_96 => 12 * 1024,
+        FileFormat::MP3_160_ENC => 20 * 1024,
+        FileFormat::MP4_128_DUAL => 16 * 1024,
+        FileFormat::OTHER3 => 40 * 1024, // better some high guess than nothing
+        FileFormat::AAC_160 => 20 * 1024,
+        FileFormat::AAC_320 => 40 * 1024,
+        FileFormat::MP4_128 => 16 * 1024,
+        FileFormat::OTHER5 => 40 * 1024, // better some high guess than nothing
+    }
+}
+
 impl PlayerTrackLoader {
     async fn find_available_alternative(&self, audio: AudioItem) -> Option<AudioItem> {
         if audio.available {
@@ -639,22 +658,7 @@ impl PlayerTrackLoader {
     }
 
     fn stream_data_rate(&self, format: FileFormat) -> usize {
-        match format {
-            FileFormat::OGG_VORBIS_96 => 12 * 1024,
-            FileFormat::OGG_VORBIS_160 => 20 * 1024,
-            FileFormat::OGG_VORBIS_320 => 40 * 1024,
-            FileFormat::MP3_256 => 32 * 1024,
-            FileFormat::MP3_320 => 40 * 1024,
-            FileFormat::MP3_160 => 20 * 1024,
-            FileFormat::MP3_96 => 12 * 1024,
-            FileFormat::MP3_160_ENC => 20 * 1024,
-            FileFormat::MP4_128_DUAL => 16 * 1024,
-            FileFormat::OTHER3 => 40 * 1024, // better some high guess than nothing
-            FileFormat::AAC_160 => 20 * 1024,
-            FileFormat::AAC_320 => 40 * 1024,
-            FileFormat::MP4_128 => 16 * 1024,
-            FileFormat::OTHER5 => 40 * 1024, // better some high guess than nothing
-        }
+        stream_data_rate(format)
     }
 
     async fn load_track(
