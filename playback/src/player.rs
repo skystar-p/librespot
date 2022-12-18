@@ -1903,9 +1903,9 @@ impl ::std::fmt::Debug for PlayerState {
         }
     }
 }
-struct Subfile<T: Read + Seek> {
-    stream: T,
-    offset: u64,
+pub struct Subfile<T: Read + Seek> {
+    pub stream: T,
+    pub offset: u64,
 }
 
 impl<T: Read + Seek> Subfile<T> {
