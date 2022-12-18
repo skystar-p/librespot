@@ -745,9 +745,11 @@ impl PlayerTrackLoader {
 
             if play_from_beginning {
                 // No need to seek -> we stream from the beginning
+                info!("stream_loader_controller.set_stream_mode()");
                 stream_loader_controller.set_stream_mode();
             } else {
                 // we need to seek -> we set stream mode after the initial seek.
+                info!("stream_loader_controller.set_random_access_mode()");
                 stream_loader_controller.set_random_access_mode();
             }
 
