@@ -214,7 +214,7 @@ impl NormalisationData {
         ratio.log10() * DB_VOLTAGE_RATIO
     }
 
-    fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
+    pub fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
         file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
 
@@ -233,7 +233,7 @@ impl NormalisationData {
         Ok(r)
     }
 
-    fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
+    pub fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
         let [gain_db, gain_peak] = match config.normalisation_type {
             NormalisationType::Album => [data.album_gain_db, data.album_peak],
             NormalisationType::Track => [data.track_gain_db, data.track_peak],

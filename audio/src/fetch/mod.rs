@@ -140,8 +140,18 @@ impl StreamLoaderController {
     fn send_stream_loader_command(&self, command: StreamLoaderCommand) {
         if let Some(ref channel) = self.channel_tx {
             // ignore the error in case the channel has been closed already.
-            let _ = channel.send(command);
+            let e = channel.send(command);
+            if e.is_err() {
+                debug!("StreamLoaderController: send error: {:?}", e);
+            }
+        } else {
+            debug!("StreamLoaderController: no tx channel available");
         }
+    }
+
+    pub fn fetch_helper(&self, start: usize, length: usize) {
+        // signal the stream loader to fetch a range of the file
+        self.fetch(Range::new(start, length))
     }
 
     pub fn fetch(&self, range: Range) {
@@ -282,7 +292,12 @@ impl AudioFile {
         if initial_data_length % 4 != 0 {
             initial_data_length += 4 - (initial_data_length % 4);
         }
+
+        debug!("Initial data length: {}", initial_data_length);
+
         let (headers, data) = request_range(session, file_id, 0, initial_data_length).split();
+
+        debug!("request_range called");
 
         let streaming = AudioFileStreaming::open(
             session.clone(),
@@ -294,6 +309,8 @@ impl AudioFile {
             complete_tx,
             bytes_per_second,
         );
+
+        debug!("AudioFileStreaming::open called");
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
@@ -372,6 +389,7 @@ impl AudioFileStreaming {
         let (stream_loader_command_tx, stream_loader_command_rx) =
             mpsc::unbounded_channel::<StreamLoaderCommand>();
 
+        debug!("AudioFileStreaming::open: spawning audio_file_fetch() loop");
         session.spawn(audio_file_fetch(
             session.clone(),
             shared.clone(),
@@ -395,6 +413,7 @@ impl AudioFileStreaming {
 impl Read for AudioFileStreaming {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let offset = self.position as usize;
+        debug!("AudioFileStreaming::read: Reading {} bytes at offset {}", output.len(), offset);
 
         if offset >= self.shared.file_size {
             return Ok(0);
@@ -424,11 +443,17 @@ impl Read for AudioFileStreaming {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length_to_request));
 
+        debug!("AudioFileStreaming::read: aquiring download_status lock");
         let mut download_status = self.shared.download_status.lock().unwrap();
+        debug!("AudioFileStreaming::read: aquired download_status lock");
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
+        if ranges_to_request.is_empty() {
+            debug!("AudioFileStreaming::read: No ranges to request");
+        }
         for &range in ranges_to_request.iter() {
+            debug!("Requesting range: {:?}", range);
             self.stream_loader_command_tx
                 .send(StreamLoaderCommand::Fetch(range))
                 .unwrap();
@@ -440,6 +465,7 @@ impl Read for AudioFileStreaming {
 
         let mut download_message_printed = false;
         while !download_status.downloaded.contains(offset) {
+            debug!("AudioFileStreaming::read: offset {} is not downloaded, waiting", offset);
             if let DownloadStrategy::Streaming() = *self.shared.download_strategy.lock().unwrap() {
                 if !download_message_printed {
                     debug!("Stream waiting for download of file position {}. Downloaded ranges: {}. Pending ranges: {}", offset, download_status.downloaded, download_status.requested.minus(&download_status.downloaded));

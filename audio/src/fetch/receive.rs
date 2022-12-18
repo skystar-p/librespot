@@ -200,6 +200,7 @@ impl AudioFileFetch {
         ranges_to_request.subtract_range_set(&download_status.requested);
 
         for range in ranges_to_request.iter() {
+            debug!("AudioFileFetch::download_range: Requesting range {} (+{}).", range.start, range.length);
             let (_headers, data) = request_range(
                 &self.session,
                 self.shared.file_id,
@@ -333,6 +334,7 @@ impl AudioFileFetch {
     fn handle_stream_loader_command(&mut self, cmd: StreamLoaderCommand) -> ControlFlow {
         match cmd {
             StreamLoaderCommand::Fetch(request) => {
+                debug!("AudioFileFetch::handle_stream_loader_command: received Fetch command: {} (+{}).", request.start, request.length);
                 self.download_range(request.start, request.length);
             }
             StreamLoaderCommand::RandomAccessMode() => {
@@ -374,6 +376,7 @@ pub(super) async fn audio_file_fetch(
         download_status.requested.add_range(&requested_range);
     }
 
+    debug!("AudioFileFetch::audio_file_fetch: spawning receive_data");
     session.spawn(receive_data(
         shared.clone(),
         file_data_tx.clone(),
@@ -393,19 +396,25 @@ pub(super) async fn audio_file_fetch(
         network_response_times_ms: Vec::new(),
     };
 
+    debug!("AudioFileFetch::audio_file_fetch: going into loop");
     loop {
+        debug!("AudioFileFetch::audio_file_fetch: going into tokio select");
         tokio::select! {
             cmd = stream_loader_command_rx.recv() => {
+                debug!("AudioFileFetch::audio_file_fetch: received event from stream_loader_command_rx: {:?}", cmd);
                 if cmd.map_or(true, |cmd| fetch.handle_stream_loader_command(cmd) == ControlFlow::Break) {
+                    debug!("AudioFileFetch::audio_file_fetch: breaking out of loop");
                     break;
                 }
             },
             data = file_data_rx.recv() => {
+                debug!("AudioFileFetch::audio_file_fetch: received event from file_data_rx");
                 if data.map_or(true, |data| fetch.handle_file_data(data) == ControlFlow::Break) {
                     break;
                 }
             }
         }
+        debug!("AudioFileFetch::audio_file_fetch: just out from tokio select");
 
         if fetch.get_download_strategy() == DownloadStrategy::Streaming() {
             let number_of_open_requests = fetch
@@ -444,4 +453,5 @@ pub(super) async fn audio_file_fetch(
             }
         }
     }
+    debug!("AudioFileFetch::audio_file_fetch: just out from loop");
 }
